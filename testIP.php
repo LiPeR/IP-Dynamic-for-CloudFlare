@@ -3,7 +3,7 @@ header('Content-Type: text/plain');
 $timestart=microtime(true);
 /**
  * @author Stéphane Rochat <contact@stephanerochat.ch>
- * @version 2.0
+ * @version 2.1
  * @license http://creativecommons.org/licenses/by-nc/4.0/
  */
 
@@ -15,20 +15,28 @@ Clickatell : https://www.clickatell.com/apis-scripts/apis/http-s/
 // User defined var
 
 /************* CloudFlare **********************/
-$CFtoken = 'TOKEN';	 							// This is the API key made available on your Account page.
-$CFemail = 'EMAIL';								// The e-mail address associated with the API key
-$CFdomain = 'DOMAIN.TLD';						// The target domain
+// $CFtoken = 'TOKEN';	 							// This is the API key made available on your Account page.
+// $CFemail = 'EMAIL';								// The e-mail address associated with the API key
+// $CFdomain = 'DOMAIN.TLD';						// The target domain
 
 /**************** Mail *************************/
-$mailTo = 'EMAIL';								// Receiver of the mail
-$mailFrom = 'EMAIL';								// From mail
+// $mailTo = 'EMAIL';								// Receiver of the mail
+// $mailFrom = 'EMAIL';								// From mail
 
 /************* Clickatell **********************/
-$CATusername = 'USERNAME';						// Clickatell username
-$CATpwd = 'PASSWORD';							// Clickatell password
-$CATapi = 'API';									// Clickatell API key
-$CATTo ='PHONENUM';								// Receiver number phone
+// $CATusername = 'USERNAME';						// Clickatell username
+// $CATpwd = 'PASSWORD';							// Clickatell password
+// $CATapi = 'API';									// Clickatell API key
+// $CATTo ='PHONENUM';								// Receiver number phone
 // End of User defined var
+
+// Global var
+$userAgent = 'curl';
+$curl_headers = array(
+	'X-Auth-Email: '.$CFemail,
+	'X-Auth-Key: '.$CFtoken,
+	'Content-Type: application/json');
+// End of Global var
 
 // Get actual IP
 $contents = file_get_contents('http://api.ipify.org/?format=json');
@@ -39,19 +47,14 @@ if(!filter_var($ipifyJson['ip'], FILTER_VALIDATE_IP)) {
 }
 
 // Get zone info (we need the ID)
-$ch = curl_init('https://api.cloudflare.com/client/v4/zones?name='.$CFdomain);
-curl_setopt(
-    $ch, 
-    CURLOPT_HTTPHEADER,
-    array(
-        'X-Auth-Email: '.$CFemail,
-        'X-Auth-Key: '.$CFtoken,
-        'Content-Type: application/json'
-    )
-);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-$CFZones = json_decode(curl_exec($ch), true);
-curl_close($ch);
+$curl = curl_init();
+curl_setopt($curl, CURLOPT_URL, 'https://api.cloudflare.com/client/v4/zones?name='.$CFdomain);
+curl_setopt($curl, CURLOPT_COOKIESESSION, true);
+curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($curl, CURLOPT_HTTPHEADER, $curl_headers);
+curl_setopt($curl, CURLOPT_USERAGENT, 'curl');
+$CFZones = json_decode(curl_exec($curl), true);
+curl_close($curl);
 
 if($CFZones['success'] != 1) {
 	echo $CFZones['errors'][0]['error_chain'][0]['message']."\n";
@@ -59,21 +62,14 @@ if($CFZones['success'] != 1) {
 }
 
 // We have the ID, let's get "A" Records of the domain
-$ch = curl_init('https://api.cloudflare.com/client/v4/zones/'.$CFZones['result']['0']['id'].'/dns_records?type=A&?name='.$CFdomain);
-curl_setopt(
-    $ch, 
-    CURLOPT_HTTPHEADER,
-    array(
-        'X-Auth-Email: '.$CFemail,
-        'X-Auth-Key: '.$CFtoken,
-        'Content-Type: application/json'
-    )
-);
-
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-$CFDNSRecords = json_decode(curl_exec($ch), true);
-curl_close($ch);
-
+$curl = curl_init();
+curl_setopt($curl, CURLOPT_URL, 'https://api.cloudflare.com/client/v4/zones/'.$CFZones['result']['0']['id'].'/dns_records?type=A&?name='.$CFdomain);
+curl_setopt($curl, CURLOPT_COOKIESESSION, true);
+curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($curl, CURLOPT_HTTPHEADER, $curl_headers);
+curl_setopt($curl, CURLOPT_USERAGENT, 'curl');
+$CFDNSRecords = json_decode(curl_exec($curl), true);
+curl_close($curl);
 
 $qtyRecords = $CFDNSRecords['result_info']['total_count'];
 $errCloudFlare = FALSE;
@@ -89,21 +85,17 @@ for ($i = 0; $i < $qtyRecords; $i++) {
 		);
 
 		// Update it
-		$ch = curl_init('https://api.cloudflare.com/client/v4/zones/'.$CFZones['result']['0']['id'].'/dns_records/'.$CFDNSRecords['result'][$i]['id']);
-		curl_setopt(
-			$ch, 
-			CURLOPT_HTTPHEADER,
-			array(
-				'X-Auth-Email: '.$CFemail,
-				'X-Auth-Key: '.$CFtoken,
-				'Content-Type: application/json'
-			)
-		);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
-		curl_setopt($ch, CURLOPT_POSTFIELDS,json_encode($data));
-		$CFUpdateRecord = json_decode(curl_exec($ch), true);
-		curl_close($ch);
+		
+		$curl = curl_init();
+		curl_setopt($curl, CURLOPT_URL, 'https://api.cloudflare.com/client/v4/zones/'.$CFZones['result']['0']['id'].'/dns_records/'.$CFDNSRecords['result'][$i]['id']);
+		curl_setopt($curl, CURLOPT_COOKIESESSION, true);
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($curl, CURLOPT_HTTPHEADER, $curl_headers);
+		curl_setopt($curl, CURLOPT_USERAGENT, 'curl');
+		curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "PUT");
+		curl_setopt($curl, CURLOPT_POSTFIELDS,json_encode($data));
+		$CFUpdateRecord = json_decode(curl_exec($curl), true);
+		curl_close($curl);
 		
 		// Error handling
 		if($CFUpdateRecord['success'] == '1')
@@ -123,8 +115,8 @@ if($errCloudFlare || $ipUpdated)
 	// Gen text for errors
 	if(is_array($errCloudFlare))
 	{
-		$subject = '[NAS] IP Different - Error with CloudFlare';
-		$messageSMS = 'IP+has+change,+new+is+:+'.$ipifyJson['ip'].'+-+Error+with+CloudFlare';
+		$subject = 'IP Different - Error with CloudFlare';
+		$messageSMS = 'IP+changed,+new+is+:+'.$ipifyJson['ip'].'+-+Error+with+CloudFlare';
 		
 		$messageMail = 'Errors :'."\n";
 		foreach ($errCloudFlare as &$value)
@@ -135,8 +127,8 @@ if($errCloudFlare || $ipUpdated)
 	// Gen text for success
 	elseif(is_array($ipUpdated))
 	{
-		$subject = '[NAS] IP Different';
-		$messageSMS = 'IP+has+change,+new+is+:+'.$ipifyJson['ip'];
+		$subject = 'IP Different';
+		$messageSMS = 'IP+changed,+new+is+:+'.$ipifyJson['ip'];
 		
 		$messageMail = 'Updated with new IP ('.$ipifyJson['ip'].') :'."\n";
 		foreach ($ipUpdated as &$value)
@@ -153,7 +145,7 @@ if($errCloudFlare || $ipUpdated)
 	$headers .= "Importance: High\n";
 	
 	$page_load_time = microtime(true)-$timestart;
-	$timeToExecute = "Script execute en " . $page_load_time . " sec";
+	$timeToExecute = "Script executed in " . $page_load_time . " sec";
 	
 	$mailer = mail($mailTo, utf8_decode(stripslashes($subject)), utf8_decode(stripslashes($messageMail.$timeToExecute)), $headers);
 	
